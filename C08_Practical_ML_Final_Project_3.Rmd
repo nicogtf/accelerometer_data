@@ -1,0 +1,208 @@
+---
+title: "Final Project"
+author: "Nicola Barbieri"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Steps in this project
+
+1. Remove unnecessary columns
+2. Cross Validation
+3. 5 fold
+4. Parallel Computation
+5. Accuracy in training set
+6. Prediction on test set
+
+```{r, echo=FALSE, cache=FALSE}
+intervalStart <- Sys.time()
+library(mlbench)
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(klaR)
+library(corrplot)
+library(MLmetrics)
+set.seed(1)
+```
+
+## Load Data
+
+```{r, cache=TRUE}
+df_train <- read.csv('pml-training.csv', header = TRUE, stringsAsFactors = FALSE)
+df_test <- read.csv('pml-testing.csv', header = TRUE, stringsAsFactors = FALSE)
+```
+
+## EDA
+
+```{r eda01}
+# head(df_train)
+dim(df_train)
+
+```
+
+
+
+
+
+What type of variable is the target ('classe')?
+
+```{r}
+summary(df_train$classe)
+unique(df_train$classe)
+```
+
+Let's convert it to factor:
+```{r}
+df_train$classe <- factor(df_train$classe)
+summary(df_train$classe)
+```
+
+
+How many NA values?
+```{r}
+sum(is.na(df_train))
+```
+
+What is the percentage of NA values?
+
+```{r}
+sum(is.na(df_train)) / (dim(df_train)[1] * (dim(df_train)[2]-1))
+```
+
+The columns with NA values have all the same amount with rows with NA: 19216 and 406 rows different from NA.
+Let's remove the columns with NA:
+
+```{r}
+library(dplyr)
+df_train <- df_train %>% select_if(~ !any(is.na(.)))
+```
+
+Let's remove 'character' type columns:
+
+```{r}
+df_train <- df_train[,sapply(df_train, class) != "character"]
+```
+
+Let's remove other not needed columns:
+
+```{r}
+df_train <- subset(df_train, select =-c(X, raw_timestamp_part_1, raw_timestamp_part_2, num_window))
+```
+
+
+Remaining columns:
+```{r}
+names_train <- names(df_train)
+names_test <- names_train[1:length(names_train)-1]
+str(df_train)
+```
+
+Keep the same columns in Test set:
+
+```{r}
+df_test <- df_test %>% dplyr::select(all_of(names_test))
+
+
+```
+
+### Subsample
+
+Used only to tune the model
+
+```{r}
+# no_samples <- 5000
+# rows_to_keep <- sample(1:nrow(df_train), size = no_samples)
+# df_train <- df_train[rows_to_keep,]
+# dim(df_train)
+```
+
+## y and x to avoid slowness of caret() with model syntax
+
+```{r}
+y <- df_train[,"classe"]
+x <- subset(df_train, select = - classe)
+```
+
+```{r}
+corr_mat <- cor(df_train[,-ncol(df_train)])
+corrplot(corr_mat, order = "hclust", tl.cex = 1, addrect = 8)
+```
+
+## Models
+
+```{r}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+```
+
+
+Pre-processing and cross-validation:
+
+```{r}
+
+
+
+fitControl <- trainControl(method="cv",
+                            number = 5,
+                            preProcOptions = list(thresh = 0.1), # threshold for pca preprocess
+                            classProbs = TRUE,
+                           allowParallel = TRUE,
+                            summaryFunction = multiClassSummary
+                           )
+```
+
+
+
+
+
+### Random Forest
+`
+
+
+```{r rf, cache=FALSE}
+
+model_rf <- train(x,
+                  y,
+                  method="rf",
+                  metric="Accuracy",
+                  preProcess = c('center', 'scale'),
+                  trControl=fitControl)
+
+```
+
+
+
+
+```{r}
+stopCluster(cluster)
+registerDoSEQ()
+```
+
+
+
+
+```{r}
+pred_rf <- predict(model_rf, df_train)
+cm_rf <- confusionMatrix(pred_rf, df_train$classe, positive = "M")
+cm_rf
+```
+
+
+## Accuracy
+
+```{r}
+sum(pred_rf == df_train$classe) / dim(df_train)[1]
+```
+
+
+## Prediction on test set
+
+```{r}
+pred_test <- predict(model_rf, newdata = df_test)
+pred_test
+```
+
+
