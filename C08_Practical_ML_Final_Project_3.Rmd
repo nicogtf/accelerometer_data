@@ -14,7 +14,7 @@ output: html_document
 5. Accuracy in training set
 6. Prediction on test set
 
-```{r, echo=FALSE, cache=FALSE}
+```{r, echo=TRUE, cache=FALSE, results='hide', warning=FALSE, message=FALSE}
 intervalStart <- Sys.time()
 library(mlbench)
 library(caret)
@@ -26,14 +26,14 @@ library(MLmetrics)
 set.seed(1)
 ```
 
-## Load Data
+### Load Data
 
 ```{r, cache=TRUE}
 df_train <- read.csv('pml-training.csv', header = TRUE, stringsAsFactors = FALSE)
 df_test <- read.csv('pml-testing.csv', header = TRUE, stringsAsFactors = FALSE)
 ```
 
-## EDA
+### EDA
 
 ```{r eda01}
 # head(df_train)
@@ -95,7 +95,7 @@ Remaining columns:
 ```{r}
 names_train <- names(df_train)
 names_test <- names_train[1:length(names_train)-1]
-str(df_train)
+#str(df_train)
 ```
 
 Keep the same columns in Test set:
@@ -111,25 +111,27 @@ df_test <- df_test %>% dplyr::select(all_of(names_test))
 Used only to tune the model
 
 ```{r}
-# no_samples <- 5000
+# no_samples <- 50
 # rows_to_keep <- sample(1:nrow(df_train), size = no_samples)
 # df_train <- df_train[rows_to_keep,]
 # dim(df_train)
 ```
 
-## y and x to avoid slowness of caret() with model syntax
+### y and x to avoid slowness of caret() with model syntax
 
 ```{r}
 y <- df_train[,"classe"]
 x <- subset(df_train, select = - classe)
 ```
 
+
+### Correlation Plot
 ```{r}
 corr_mat <- cor(df_train[,-ncol(df_train)])
 corrplot(corr_mat, order = "hclust", tl.cex = 1, addrect = 8)
 ```
 
-## Models
+### Models
 
 ```{r}
 library(parallel)
@@ -164,12 +166,12 @@ fitControl <- trainControl(method="cv",
 
 ```{r rf, cache=FALSE}
 
-model_rf <- train(x,
+system.time(model_rf <- train(x,
                   y,
                   method="rf",
                   metric="Accuracy",
                   preProcess = c('center', 'scale'),
-                  trControl=fitControl)
+                  trControl=fitControl))
 
 ```
 
@@ -191,14 +193,14 @@ cm_rf
 ```
 
 
-## Accuracy
+### Accuracy
 
 ```{r}
 sum(pred_rf == df_train$classe) / dim(df_train)[1]
 ```
 
 
-## Prediction on test set
+### Prediction on test set
 
 ```{r}
 pred_test <- predict(model_rf, newdata = df_test)
